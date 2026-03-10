@@ -97,9 +97,12 @@ class FriendWishlistScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: item.photoUrl != null
-                      ? Image.network(
-                          item.photoUrl!,
-                          fit: BoxFit.cover,
+                      ? Container(
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                          child: Image.network(
+                            item.photoUrl!,
+                            fit: BoxFit.contain,
+                          ),
                         )
                       : Container(
                           decoration: BoxDecoration(

@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import '../models/wishlist_item.dart';
 import '../main.dart'; // import supabase instance
+import 'package:metadata_fetch/metadata_fetch.dart';
 
 class AddEditItemScreen extends StatefulWidget {
   final WishlistItem? itemToEdit;
@@ -23,6 +24,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   bool _isLoading = false;
   Uint8List? _imageBytes;
   String? _existingPhotoUrl;
+  String? _metadataPhotoUrl; // URL buscada via link
 
   @override
   void initState() {
@@ -70,6 +72,54 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     return publicUrl;
   }
 
+  Future<void> _fetchMetadata() async {
+    final link = _linkController.text.trim();
+    if (link.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Insira um link primeiro')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final data = await MetadataFetch.extract(link);
+      if (data != null && data.image != null) {
+        setState(() {
+          _metadataPhotoUrl = data.image;
+          // Se buscou do link, limpamos a imagem manual para priorizar a do link na visualização
+          _imageBytes = null;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Imagem encontrada no link!')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Não foi possível encontrar uma imagem neste link.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao buscar metadados: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   Future<void> _saveItem() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -83,6 +133,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       String? photoUrl = _existingPhotoUrl;
       if (_imageBytes != null) {
         photoUrl = await _uploadImage(userId);
+      } else if (_metadataPhotoUrl != null) {
+        photoUrl = _metadataPhotoUrl;
       }
 
       final itemData = {
@@ -140,10 +192,12 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                         height: 200,
                         color: Colors.grey[200],
                         child: _imageBytes != null
-                            ? Image.memory(_imageBytes!, fit: BoxFit.cover)
-                            : (_existingPhotoUrl != null
-                                ? Image.network(_existingPhotoUrl!, fit: BoxFit.cover)
-                                : const Icon(Icons.add_a_photo, size: 50, color: Colors.grey)),
+                            ? Image.memory(_imageBytes!, fit: BoxFit.contain)
+                            : (_metadataPhotoUrl != null
+                                ? Image.network(_metadataPhotoUrl!, fit: BoxFit.contain)
+                                : (_existingPhotoUrl != null
+                                    ? Image.network(_existingPhotoUrl!, fit: BoxFit.contain)
+                                    : const Icon(Icons.add_a_photo, size: 50, color: Colors.grey))),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -161,7 +215,14 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _linkController,
-                      decoration: const InputDecoration(labelText: 'Link de onde comprar'),
+                      decoration: InputDecoration(
+                        labelText: 'Link de onde comprar',
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.auto_fix_high),
+                          tooltip: 'Buscar foto pelo link',
+                          onPressed: _fetchMetadata,
+                        ),
+                      ),
                       keyboardType: TextInputType.url,
                     ),
                     const SizedBox(height: 32),
