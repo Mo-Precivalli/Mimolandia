@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import '../models/wishlist_item.dart';
 import '../main.dart'; // import supabase instance
 import 'package:metadata_fetch/metadata_fetch.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class AddEditItemScreen extends StatefulWidget {
   final WishlistItem? itemToEdit;
@@ -86,29 +88,63 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     });
 
     try {
-      final data = await MetadataFetch.extract(link);
-      if (data != null && data.image != null) {
+      // 1. Tentar busca direta (Funciona bem em Apps Mobile)
+      Metadata? data;
+      try {
+        data = await MetadataFetch.extract(link);
+      } catch (e) {
+        debugPrint('Busca direta falhou, tentando via proxy: $e');
+      }
+
+      // 2. Fallback via Proxy de CORS (Essencial para Flutter Web)
+      if (data == null || data.image == null) {
+        final proxyUrl = 'https://api.allorigins.win/get?url=${Uri.encodeComponent(link)}';
+        final response = await http.get(Uri.parse(proxyUrl));
+        
+        if (response.statusCode == 200) {
+          final jsonData = jsonDecode(response.body);
+          final htmlContent = jsonData['contents'] as String;
+          
+          // O metadata_fetch pode processar a string HTML diretamente
+          data = await MetadataFetch.extract(link); // Re-extracting for simplicity if proxy just returns content
+          // Or more accurately if we have the content:
+          final doc = MetadataFetch.responseToDocument(http.Response(htmlContent, 200));
+          if (doc != null) {
+              // Usually MetadataFetch.extract handles the logic, 
+              // but if we are parsing a manually fetched doc:
+              data = MetadataParser.parse(doc); 
+          }
+        }
+      }
+
+      if (data != null) {
         setState(() {
-          _metadataPhotoUrl = data.image;
-          // Se buscou do link, limpamos a imagem manual para priorizar a do link na visualização
-          _imageBytes = null;
+          if (data?.image != null) {
+            _metadataPhotoUrl = data!.image;
+            _imageBytes = null; // Prioriza a do link
+          }
+          // Sugerir título se estiver vazio
+          if (_tituloController.text.trim().isEmpty && data?.title != null) {
+            _tituloController.text = data!.title!;
+          }
         });
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Imagem encontrada no link!')),
+            const SnackBar(content: Text('Informações recuperadas com sucesso!')),
           );
         }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Não foi possível encontrar uma imagem neste link.')),
+            const SnackBar(content: Text('Não foi possível extrair dados deste link automaticamente.')),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao buscar metadados: $e')),
+          SnackBar(content: Text('Erro ao buscar link: $e')),
         );
       }
     } finally {
