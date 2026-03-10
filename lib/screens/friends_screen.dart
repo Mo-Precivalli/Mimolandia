@@ -37,7 +37,16 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
               setStateDialog(() => _isSearching = true);
               try {
-                final currentUserId = supabase.auth.currentUser!.id;
+                final currentUser = supabase.auth.currentUser;
+                if (currentUser == null) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(contextDialog).showSnackBar(
+                      const SnackBar(content: Text('Faça login para buscar amigos')),
+                    );
+                  }
+                  return;
+                }
+                final currentUserId = currentUser.id;
                 
                 // 1. Get current friends
                 final friendsResponse = await supabase
@@ -190,7 +199,32 @@ class _FriendsScreenState extends State<FriendsScreen> {
   }
 
   Widget _buildFriendsList() {
-    final userId = supabase.auth.currentUser!.id;
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.people_outline, size: 60, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(height: 16),
+            const Text(
+              'Você está como Anônimo.\nPara adicionar amigos, faça login.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pushNamed('/login');
+              },
+              icon: const Icon(Icons.login),
+              label: const Text('Fazer Login'),
+            ),
+          ],
+        ),
+      );
+    }
+    final userId = user.id;
     
     // Busca os amigos que O USUÁRIO adicionou
     final stream = supabase
@@ -264,11 +298,12 @@ class _FriendsScreenState extends State<FriendsScreen> {
               const Expanded(
                 child: Text('Meus Amigos:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               ),
-              IconButton(
-                icon: const Icon(Icons.person_add),
-                onPressed: _showSearchDialog,
-                tooltip: 'Encontrar Amigos',
-              ),
+              if (supabase.auth.currentUser != null)
+                IconButton(
+                  icon: const Icon(Icons.person_add),
+                  onPressed: _showSearchDialog,
+                  tooltip: 'Encontrar Amigos',
+                ),
             ],
           ),
         ),

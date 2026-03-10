@@ -89,12 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ? const CircularProgressIndicator()
                   : const Text('Entrar'),
             ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pushNamed('/register');
-              },
-              child: const Text('Não tem uma conta? Cadastre-se'),
-            ),
+            // Botão de cadastro removido, contas são criadas por fora
           ],
         ),
       ),

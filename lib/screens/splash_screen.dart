@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../main.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -21,15 +20,8 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (!mounted) return;
 
-    // Verifica se há um usuário autenticado na sessão atual do Supabase
-    final session = supabase.auth.currentSession;
-    if (session != null) {
-      // Já está logado, vai pra Home
-      Navigator.of(context).pushReplacementNamed('/home');
-    } else {
-      // Não está logado, vai pro Login
-      Navigator.of(context).pushReplacementNamed('/login');
-    }
+    // Vai direto para a Home, permitindo uso como anônimo
+    Navigator.of(context).pushReplacementNamed('/home');
   }
 
   @override

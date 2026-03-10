@@ -27,7 +27,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadUserName() async {
     try {
-      final userId = supabase.auth.currentUser!.id;
+      final user = supabase.auth.currentUser;
+      if (user == null) {
+        if (mounted) {
+          setState(() {
+            _userName = 'Usuário Anônimo';
+          });
+        }
+        return;
+      }
+      final userId = user.id;
       final response = await supabase
           .from('profiles')
           .select('nome')
@@ -60,7 +69,32 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMinhaLista() {
-    final userId = supabase.auth.currentUser!.id;
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.person_outline, size: 60, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(height: 16),
+            const Text(
+              'Você está como Anônimo.\nPara ver e criar sua lista, faça login.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pushNamed('/login');
+              },
+              icon: const Icon(Icons.login),
+              label: const Text('Fazer Login'),
+            ),
+          ],
+        ),
+      );
+    }
+    final userId = user.id;
     final stream = supabase
         .from('wishlist_items')
         .stream(primaryKey: ['id'])
@@ -278,6 +312,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ).pushNamed('/settings').then((_) => _loadUserName());
               } else if (value == 'logout') {
                 _signOut();
+              } else if (value == 'login') {
+                Navigator.of(context).pushNamed('/login');
               }
             },
             itemBuilder: (BuildContext context) {
@@ -303,16 +339,28 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
-                const PopupMenuItem<String>(
-                  value: 'logout',
-                  child: Row(
-                    children: [
-                      Icon(Icons.logout, size: 20, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Sair', style: TextStyle(color: Colors.red)),
-                    ],
+                if (supabase.auth.currentUser != null)
+                  const PopupMenuItem<String>(
+                    value: 'logout',
+                    child: Row(
+                      children: [
+                        Icon(Icons.logout, size: 20, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Sair', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  )
+                else
+                  const PopupMenuItem<String>(
+                    value: 'login',
+                    child: Row(
+                      children: [
+                        Icon(Icons.login, size: 20, color: Colors.green),
+                        SizedBox(width: 8),
+                        Text('Fazer Login', style: TextStyle(color: Colors.green)),
+                      ],
+                    ),
                   ),
-                ),
               ];
             },
           ),
@@ -331,7 +379,7 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(icon: Icon(Icons.people), label: 'Amigos'),
         ],
       ),
-      floatingActionButton: _selectedIndex == 0
+      floatingActionButton: _selectedIndex == 0 && supabase.auth.currentUser != null
           ? FloatingActionButton(
               onPressed: () async {
                 final result = await Navigator.of(context).push(
