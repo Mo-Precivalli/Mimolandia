@@ -4,9 +4,6 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import '../models/wishlist_item.dart';
 import '../main.dart'; // import supabase instance
-import 'package:metadata_fetch/metadata_fetch.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 class AddEditItemScreen extends StatefulWidget {
   final WishlistItem? itemToEdit;
@@ -26,7 +23,6 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   bool _isLoading = false;
   Uint8List? _imageBytes;
   String? _existingPhotoUrl;
-  String? _metadataPhotoUrl; // URL buscada via link
 
   @override
   void initState() {
@@ -74,88 +70,6 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     return publicUrl;
   }
 
-  Future<void> _fetchMetadata() async {
-    final link = _linkController.text.trim();
-    if (link.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Insira um link primeiro')),
-      );
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // 1. Tentar busca direta (Funciona bem em Apps Mobile)
-      Metadata? data;
-      try {
-        data = await MetadataFetch.extract(link);
-      } catch (e) {
-        debugPrint('Busca direta falhou, tentando via proxy: $e');
-      }
-
-      // 2. Fallback via Proxy de CORS (Essencial para Flutter Web)
-      if (data == null || data.image == null) {
-        final proxyUrl = 'https://api.allorigins.win/get?url=${Uri.encodeComponent(link)}';
-        final response = await http.get(Uri.parse(proxyUrl));
-        
-        if (response.statusCode == 200) {
-          final jsonData = jsonDecode(response.body);
-          final htmlContent = jsonData['contents'] as String;
-          
-          // O metadata_fetch pode processar a string HTML diretamente
-          data = await MetadataFetch.extract(link); // Re-extracting for simplicity if proxy just returns content
-          // Or more accurately if we have the content:
-          final doc = MetadataFetch.responseToDocument(http.Response(htmlContent, 200));
-          if (doc != null) {
-              // Usually MetadataFetch.extract handles the logic, 
-              // but if we are parsing a manually fetched doc:
-              data = MetadataParser.parse(doc); 
-          }
-        }
-      }
-
-      if (data != null) {
-        setState(() {
-          if (data?.image != null) {
-            _metadataPhotoUrl = data!.image;
-            _imageBytes = null; // Prioriza a do link
-          }
-          // Sugerir título se estiver vazio
-          if (_tituloController.text.trim().isEmpty && data?.title != null) {
-            _tituloController.text = data!.title!;
-          }
-        });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Informações recuperadas com sucesso!')),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Não foi possível extrair dados deste link automaticamente.')),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao buscar link: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
   Future<void> _saveItem() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -169,8 +83,6 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       String? photoUrl = _existingPhotoUrl;
       if (_imageBytes != null) {
         photoUrl = await _uploadImage(userId);
-      } else if (_metadataPhotoUrl != null) {
-        photoUrl = _metadataPhotoUrl;
       }
 
       final itemData = {
@@ -229,11 +141,9 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                         color: Colors.grey[200],
                         child: _imageBytes != null
                             ? Image.memory(_imageBytes!, fit: BoxFit.contain)
-                            : (_metadataPhotoUrl != null
-                                ? Image.network(_metadataPhotoUrl!, fit: BoxFit.contain)
-                                : (_existingPhotoUrl != null
-                                    ? Image.network(_existingPhotoUrl!, fit: BoxFit.contain)
-                                    : const Icon(Icons.add_a_photo, size: 50, color: Colors.grey))),
+                            : (_existingPhotoUrl != null
+                                ? Image.network(_existingPhotoUrl!, fit: BoxFit.contain)
+                                : const Icon(Icons.add_a_photo, size: 50, color: Colors.grey)),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -251,14 +161,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _linkController,
-                      decoration: InputDecoration(
-                        labelText: 'Link de onde comprar',
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.auto_fix_high),
-                          tooltip: 'Buscar foto pelo link',
-                          onPressed: _fetchMetadata,
-                        ),
-                      ),
+                      decoration: const InputDecoration(labelText: 'Link de onde comprar'),
                       keyboardType: TextInputType.url,
                     ),
                     const SizedBox(height: 32),
