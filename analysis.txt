@@ -1,0 +1,4 @@
+﻿Analyzing Desejo...                                             
+
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\screens\friends_screen.dart:73:40 - use_build_context_synchronously
+
