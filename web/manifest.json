@@ -1,6 +1,6 @@
 {
-    "name": "desejo_app",
-    "short_name": "desejo_app",
+    "name": "MimoLandia",
+    "short_name": "MimoLandia",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
