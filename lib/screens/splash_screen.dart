@@ -35,7 +35,7 @@ class _SplashScreenState extends State<SplashScreen> {
             Icon(Icons.card_giftcard, size: 80, color: Colors.white),
             SizedBox(height: 24),
             Text(
-              'Desejo',
+              'MimoLandia',
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,

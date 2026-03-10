@@ -126,8 +126,8 @@ class _HomeScreenState extends State<HomeScreen> {
         if (isGrid) {
           return GridView.builder(
             padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 6,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: MediaQuery.of(context).size.width > 600 ? 6 : 2,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
               childAspectRatio: 0.8,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import 'dart:typed_data';
 import '../models/wishlist_item.dart';
 import '../main.dart'; // import supabase instance
 
@@ -21,7 +21,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   final _linkController = TextEditingController();
   
   bool _isLoading = false;
-  File? _imageFile;
+  Uint8List? _imageBytes;
   String? _existingPhotoUrl;
 
   @override
@@ -48,21 +48,22 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
 
     if (pickedFile != null) {
+      final bytes = await pickedFile.readAsBytes();
       setState(() {
-        _imageFile = File(pickedFile.path);
+        _imageBytes = bytes;
       });
     }
   }
 
   Future<String?> _uploadImage(String userId) async {
-    if (_imageFile == null) return null;
+    if (_imageBytes == null) return null;
 
     final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
     final destinationPath = '$userId/$fileName'; // Organiza por pasta de usuário
 
-    await supabase.storage.from('wishlist-images').upload(
+    await supabase.storage.from('wishlist-images').uploadBinary(
           destinationPath,
-          _imageFile!,
+          _imageBytes!,
         );
 
     final publicUrl = supabase.storage.from('wishlist-images').getPublicUrl(destinationPath);
@@ -80,7 +81,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       final userId = supabase.auth.currentUser!.id;
       
       String? photoUrl = _existingPhotoUrl;
-      if (_imageFile != null) {
+      if (_imageBytes != null) {
         photoUrl = await _uploadImage(userId);
       }
 
@@ -138,8 +139,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                       child: Container(
                         height: 200,
                         color: Colors.grey[200],
-                        child: _imageFile != null
-                            ? Image.file(_imageFile!, fit: BoxFit.cover)
+                        child: _imageBytes != null
+                            ? Image.memory(_imageBytes!, fit: BoxFit.cover)
                             : (_existingPhotoUrl != null
                                 ? Image.network(_existingPhotoUrl!, fit: BoxFit.cover)
                                 : const Icon(Icons.add_a_photo, size: 50, color: Colors.grey)),
